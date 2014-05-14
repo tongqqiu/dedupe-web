@@ -16,22 +16,7 @@ $ pip install "numpy>=1.6"
 $ pip install -r requirements.txt
 ```
 
-### Running the app
-
-There are three components that should be running simultaneously for the app to
-work: Redis, the Flask app, and the worker process that actually does the final
-deduplication:
-
-``` bash 
-$ redis-server # This command may differ depending on your OS
-$ nohup python run_queue.py &
-$ python app.py
-```
-
-For debugging purposes, it is useful to run these three processes in separate
-terminal sessions. 
-
-### Running locally as a standalone app
+## Running the app
 
 Located in the ``delpoy_scripts`` directory, there are a collection of bash
 scripts that, once run, should give you a standalone instance of the spreadsheet
@@ -49,6 +34,19 @@ in a web browser and start deduplicating. To stop the app, do this:
 ``` bash 
 $ bash stop_dedupe.sh
 ```
+
+### Running for development
+
+The above script takes care of running the separate components for `dedupe-web`. If you are working on this app, you may want to manually control the processes. There are three components that should be running simultaneously for the app to work: Redis, the Flask app, and the worker process that actually does the final deduplication:
+
+``` bash 
+$ redis-server # This command may differ depending on your OS
+$ nohup python run_queue.py &
+$ python app.py
+```
+
+For debugging purposes, it is useful to run these three processes in separate
+terminal sessions. 
 
 ## Community
 * [Dedupe Google group](https://groups.google.com/forum/?fromgroups=#!forum/open-source-deduplication)
