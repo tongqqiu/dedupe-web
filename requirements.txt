@@ -4,8 +4,4 @@ requests
 redis
 csvkit
 xlwt
-
-# ====================
-# Dedupe
-# ====================
-git+git://github.com/datamade/dedupe.git#egg=dedupe
+dedupe
