@@ -4,6 +4,9 @@ from redis import Redis
 from uuid import uuid4
 import sys
 import os
+from raven import Client
+
+client = Client(os.environ['DEDUPE_WORKER_SENTRY_URL'])
 
 redis = Redis()
 
@@ -37,6 +40,7 @@ def queue_daemon(app, rv_ttl=500):
         try:
             rv = func(*args, **kwargs)
         except Exception, e:
+            client.captureException()
             rv = 'Exc: %s' % (e.message)
         if rv is not None:
             redis.set(key, dumps(rv))

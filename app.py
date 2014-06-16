@@ -5,7 +5,6 @@ import time
 from datetime import datetime, timedelta
 import json
 import requests
-import logging
 import re
 import os
 import copy
@@ -21,6 +20,7 @@ from queue import DelayedResult
 from uuid import uuid4
 import collections
 from redis import Redis
+from raven.contrib.flask import Sentry
 
 redis = Redis()
 
@@ -32,14 +32,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['REDIS_QUEUE_KEY'] = 'deduper'
 app.secret_key = os.environ['FLASK_KEY']
+app.config['SENTRY_DSN'] = os.environ['DEDUPE_WEB_SENTRY_URL']
+
+sentry = Sentry(app)
 
 dedupers = {}
-
-loggers = [app.logger, logging.getLogger('dedupe'),
-          logging.getLogger('dedupe_utils')]
-
-for logger in loggers:
-    logger.setLevel(logging.WARNING)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -185,7 +182,7 @@ def get_pair():
         deduper = dedupers[deduper_id]['deduper']
         filename = flask_session['filename']
         dedupers[deduper_id]['last_interaction'] = datetime.now()
-        fields = deduper.data_model.field_comparators
+        fields = [f[0] for f in deduper.data_model.field_comparators]
         record_pair = deduper.uncertainPairs()[0]
         dedupers[deduper_id]['current_pair'] = record_pair
         data = []

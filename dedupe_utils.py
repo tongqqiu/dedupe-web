@@ -17,8 +17,9 @@ from openpyxl import Workbook
 from openpyxl.cell import get_column_letter
 import chardet
 
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
+from raven import Client
+
+client = Client(os.environ['DEDUPE_WORKER_SENTRY_URL'])
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'upload_data')
 
@@ -38,7 +39,7 @@ class DedupeFileIO(object):
         self.filename = filename
         self.file_type = convert.guess_format(self.filename)
         if self.file_type not in ['xls', 'csv', 'xlsx']:
-            logger.warning(' %s Unsupported Format: %s, (%s)' % (now, self.file_type, self.filename))
+            client.captureMessage(' %s Unsupported Format: %s, (%s)' % (now, self.file_type, self.filename))
             raise DedupeFileError('%s is not a supported format' % self.file_type)
         #inp_f = open(self.file_path, 'rb').read()
         #encoding = chardet.detect(inp_f)['encoding']
@@ -48,9 +49,9 @@ class DedupeFileIO(object):
         self.converted = convert.convert(open(self.file_path, 'rb'), self.file_type)
         self.line_count = self.converted.count('\n')
         if self.line_count > 10000:
-            logger.warning(' %s File too big: %s, (%s)' % (now, self.line_count, self.filename))
+            client.captureMessage(' %s File too big: %s, (%s)' % (now, self.line_count, self.filename))
             raise DedupeFileError('Your file has %s rows and we can only currently handle 10,000.' % self.line_count)
-        logger.warning(' %s Format: %s, Line Count: %s' % (now, self.file_type, self.line_count))
+        client.captureMessage(' %s Format: %s, Line Count: %s' % (now, self.file_type, self.line_count))
 
     def prepare(self, clustered_dupes):
         self.clustered_dupes = clustered_dupes
@@ -219,7 +220,6 @@ class WebDeduper(object):
         if self.training_data:
             files['training'] = os.path.relpath(self.training_data, __file__)
             files['settings'] = os.path.relpath(self.settings_path, __file__)
-        logger.info(files)
         return files
     
     def preProcess(self, column):
