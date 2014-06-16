@@ -40,7 +40,12 @@ class DedupeFileIO(object):
         if self.file_type not in ['xls', 'csv', 'xlsx']:
             client.captureMessage(' %s Unsupported Format: %s, (%s)' % (now, self.file_type, self.filename))
             raise DedupeFileError('%s is not a supported format' % self.file_type)
-        self.converted = convert.convert(open(self.file_path, 'rb'), self.file_type)
+        try:
+            self.converted = convert.convert(open(self.file_path, 'rb'), self.file_type)
+        except UnicodeDecodeError:
+            client.captureException()
+            raise DedupeFileError('We had a problem with the file you uploaded. \
+                    This might be related to encoding or the file name having the wrong file extension.')
         self.line_count = self.converted.count('\n')
         if self.line_count > 10000:
             client.captureMessage(' %s File too big: %s, (%s)' % (now, self.line_count, self.filename))
