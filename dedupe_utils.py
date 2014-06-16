@@ -15,6 +15,7 @@ from csvkit import convert
 import xlwt
 from openpyxl import Workbook
 from openpyxl.cell import get_column_letter
+import chardet
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -39,6 +40,11 @@ class DedupeFileIO(object):
         if self.file_type not in ['xls', 'csv', 'xlsx']:
             logger.warning(' %s Unsupported Format: %s, (%s)' % (now, self.file_type, self.filename))
             raise DedupeFileError('%s is not a supported format' % self.file_type)
+        #inp_f = open(self.file_path, 'rb').read()
+        #encoding = chardet.detect(inp_f)['encoding']
+        #fp = StringIO(inp_f.decode(encoding).encode('utf-8'))
+        #fp.seek(0)
+        #self.converted = convert.convert(fp, self.file_type)
         self.converted = convert.convert(open(self.file_path, 'rb'), self.file_type)
         self.line_count = self.converted.count('\n')
         if self.line_count > 10000:
