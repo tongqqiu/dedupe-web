@@ -4,9 +4,14 @@ from redis import Redis
 from uuid import uuid4
 import sys
 import os
-from raven import Client
 
-client = Client(os.environ['DEDUPE_WORKER_SENTRY_URL'])
+try:
+    from raven import Client
+    client = Client(os.environ['DEDUPE_WORKER_SENTRY_URL'])
+except ImportError:
+    client = None
+except KeyError:
+    client = None
 
 redis = Redis()
 

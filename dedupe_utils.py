@@ -16,9 +16,13 @@ import xlwt
 from openpyxl import Workbook
 from openpyxl.cell import get_column_letter
 
-from raven import Client
-
-client = Client(os.environ['DEDUPE_WORKER_SENTRY_URL'])
+try:
+    from raven import Client
+    client = Client(os.environ['DEDUPE_WORKER_SENTRY_URL'])
+except ImportError:
+    client = None
+except KeyError:
+    client = None
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'upload_data')
 
@@ -38,19 +42,23 @@ class DedupeFileIO(object):
         self.filename = filename
         self.file_type = convert.guess_format(self.filename)
         if self.file_type not in ['xls', 'csv', 'xlsx']:
-            client.captureMessage(' %s Unsupported Format: %s, (%s)' % (now, self.file_type, self.filename))
+            if client:
+                client.captureMessage(' %s Unsupported Format: %s, (%s)' % (now, self.file_type, self.filename))
             raise DedupeFileError('%s is not a supported format' % self.file_type)
         try:
             self.converted = convert.convert(open(self.file_path, 'rb'), self.file_type)
         except UnicodeDecodeError:
-            client.captureException()
+            if client:
+                client.captureException()
             raise DedupeFileError('We had a problem with the file you uploaded. \
                     This might be related to encoding or the file name having the wrong file extension.')
         self.line_count = self.converted.count('\n')
         if self.line_count > 10000:
-            client.captureMessage(' %s File too big: %s, (%s)' % (now, self.line_count, self.filename))
+            if client:
+                client.captureMessage(' %s File too big: %s, (%s)' % (now, self.line_count, self.filename))
             raise DedupeFileError('Your file has %s rows and we can only currently handle 10,000.' % self.line_count)
-        client.captureMessage(' %s Format: %s, Line Count: %s' % (now, self.file_type, self.line_count))
+        if client:
+            client.captureMessage(' %s Format: %s, Line Count: %s' % (now, self.file_type, self.line_count))
 
     def prepare(self, clustered_dupes):
         self.clustered_dupes = clustered_dupes

@@ -15,6 +15,8 @@ virtualenv-1.11.5/virtualenv.py venv
 
 source $PYTHON_BIN/activate
 
+cd $DIR
+
 $PYTHON_BIN/pip install "numpy>=1.6"
 $PYTHON_BIN/pip install -r ../requirements.txt
 $PYTHON_BIN/pip install supervisor --pre

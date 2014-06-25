@@ -20,7 +20,6 @@ from queue import DelayedResult
 from uuid import uuid4
 import collections
 from redis import Redis
-from raven.contrib.flask import Sentry
 
 redis = Redis()
 
@@ -32,9 +31,16 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['REDIS_QUEUE_KEY'] = 'deduper'
 app.secret_key = os.environ['FLASK_KEY']
-app.config['SENTRY_DSN'] = os.environ['DEDUPE_WEB_SENTRY_URL']
 
-sentry = Sentry(app)
+try:
+    from raven.contrib.flask import Sentry
+    app.config['SENTRY_DSN'] = os.environ['DEDUPE_WEB_SENTRY_URL']
+ 
+    sentry = Sentry(app)
+except ImportError:
+    pass
+except KeyError:
+    pass
 
 dedupers = {}
 
