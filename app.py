@@ -20,7 +20,6 @@ from queue import DelayedResult
 from uuid import uuid4
 import collections
 from redis import Redis
-from redis_session import RedisSessionInterface
 
 redis = Redis()
 
@@ -32,7 +31,6 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['REDIS_QUEUE_KEY'] = 'deduper'
 app.secret_key = os.environ['FLASK_KEY']
-app.session_interface = RedisSessionInterface()
 
 try:
     from raven.contrib.flask import Sentry
@@ -75,16 +73,22 @@ def index():
     if request.method == 'POST':
         f = request.files['input_file']
         if f and allowed_file(f.filename):
+            deduper_id = str(uuid4())
             fname = secure_filename(str(time.time()) + "_" + f.filename)
             file_path = os.path.abspath(os.path.join(UPLOAD_FOLDER, fname))
             f.save(file_path)
             try:
                 inp_file = DedupeFileIO(file_path, fname)
-                flask_session['last_interaction'] = datetime.now()
-                flask_session['deduper'] = {'csv': inp_file}
-                old = datetime.now() - timedelta(seconds=60 * 30)
-                if flask_session['last_interaction'] < old:
-                    del flask_session['deduper']
+                dedupers[deduper_id] = {
+                    'last_interaction': datetime.now(),
+                    'csv': inp_file,
+                }
+                for key, deduper in dedupers.items():
+                    last_interaction = deduper['last_interaction']
+                    old = datetime.now() - timedelta(seconds=60 * 30)
+                    if last_interaction < old:
+                        del dedupers[key]
+                flask_session['session_id'] = deduper_id
                 flask_session['filename'] = inp_file.filename
                 flask_session['file_path'] = inp_file.file_path
                 flask_session['row_count'] = inp_file.line_count
@@ -98,7 +102,6 @@ def index():
                     flask_session['ga_cid'], 
                     label=inp_file.file_type, 
                 )
-                print flask_session.keys()
                 return redirect(url_for('select_fields'))
             except DedupeFileError as e:
                 send_ga_log('Upload Error', flask_session['ga_cid'], label=e.message)
@@ -130,13 +133,13 @@ def readData(inp):
 def select_fields():
     status_code = 200
     error = None
-    print flask_session.keys()
-    if not flask_session.get('deduper'):
+    if not flask_session.get('session_id'):
         return redirect(url_for('index'))
     else:
-        inp = flask_session['deduper']['csv'].converted
+        deduper_id = flask_session['session_id']
+        inp = dedupers[deduper_id]['csv'].converted
         filename = flask_session['filename']
-        flask_session['last_interaction'] = datetime.now()
+        dedupers[deduper_id]['last_interaction'] = datetime.now()
         reader = csv.reader(StringIO(inp))
         fields = reader.next()
         del reader
@@ -148,12 +151,12 @@ def select_fields():
                 for field in field_list:
                     field_defs[field] = {'type': 'String'}
                 data_d = readData(inp)
-                flask_session['deduper']['data_d'] = data_d
-                flask_session['deduper']['field_defs'] = copy.deepcopy(field_defs)
+                dedupers[deduper_id]['data_d'] = data_d
+                dedupers[deduper_id]['field_defs'] = copy.deepcopy(field_defs)
                 start = time.time()
                 deduper = dedupe.Dedupe(field_defs)
                 deduper.sample(data_d, 150000)
-                flask_session['deduper']['deduper'] = deduper
+                dedupers[deduper_id]['deduper'] = deduper
                 end = time.time()
                 send_ga_log(
                     'Dedupe initialization', 
@@ -170,7 +173,7 @@ def select_fields():
 
 @app.route('/training_run/')
 def training_run():
-    if not flask_session.get('deduper'):
+    if not flask_session.get('session_id'):
         return redirect(url_for('index'))
     else:
         filename = flask_session['filename']
@@ -178,16 +181,17 @@ def training_run():
 
 @app.route('/get-pair/')
 def get_pair():
-    if not flask_session.get('deduper'):
+    if not flask_session.get('session_id'):
         return make_response(jsonify(status='error', message='need to start a session'), 400)
     else:
-        deduper = flask_session['deduper']['deduper']
+        deduper_id = flask_session['session_id']
+        deduper = dedupers[deduper_id]['deduper']
         filename = flask_session['filename']
-        flask_session['last_interaction'] = datetime.now()
+        dedupers[deduper_id]['last_interaction'] = datetime.now()
         #fields = [f[0] for f in deduper.data_model.field_comparators]
         fields = deduper.data_model.field_comparators
         record_pair = deduper.uncertainPairs()[0]
-        flask_session['deduper']['current_pair'] = record_pair
+        dedupers[deduper_id]['current_pair'] = record_pair
         data = []
         left, right = record_pair
         for field in fields:
@@ -203,37 +207,38 @@ def get_pair():
 
 @app.route('/mark-pair/')
 def mark_pair():
-    if not flask_session.get('deduper'):
+    if not flask_session.get('session_id'):
         return make_response(jsonify(status='error', message='need to start a session'), 400)
     else:
         action = request.args['action']
-        flask_session['last_interaction'] = datetime.now()
-        if flask_session['deduper'].get('counter'):
-            counter = flask_session['deduper']['counter']
+        deduper_id = flask_session['session_id']
+        dedupers[deduper_id]['last_interaction'] = datetime.now()
+        if dedupers[deduper_id].get('counter'):
+            counter = dedupers[deduper_id]['counter']
         else:
             counter = {'yes': 0, 'no': 0, 'unsure': 0}
-        if flask_session['deduper'].get('training_data'):
-            labels = flask_session['deduper']['training_data']
+        if dedupers[deduper_id].get('training_data'):
+            labels = dedupers[deduper_id]['training_data']
         else:
             labels = {'distinct' : [], 'match' : []}
-        deduper = flask_session['deduper']['deduper']
+        deduper = dedupers[deduper_id]['deduper']
         if action == 'yes':
-            current_pair = flask_session['deduper']['current_pair']
+            current_pair = dedupers[deduper_id]['current_pair']
             labels['match'].append(current_pair)
             counter['yes'] += 1
             resp = {'counter': counter}
         elif action == 'no':
-            current_pair = flask_session['deduper']['current_pair']
+            current_pair = dedupers[deduper_id]['current_pair']
             labels['distinct'].append(current_pair)
             counter['no'] += 1
             resp = {'counter': counter}
         elif action == 'finish':
-            file_io = flask_session['deduper']['csv']
+            file_io = dedupers[deduper_id]['csv']
             training_file_path = os.path.join(UPLOAD_FOLDER, '%s-training.json' % file_io.file_path)
-            training_data = flask_session['deduper']['training_data']
+            training_data = dedupers[deduper_id]['training_data']
             with open(training_file_path, 'wb') as f:
                 f.write(json.dumps(training_data, default=_to_json))
-            field_defs = flask_session['deduper']['field_defs']
+            field_defs = dedupers[deduper_id]['field_defs']
             sample = deduper.data_sample
             args = {
                 'field_defs': field_defs,
@@ -247,13 +252,13 @@ def mark_pair():
             flask_session['dedupe_start'] = time.time()
         else:
             counter['unsure'] += 1
-            flask_session['deduper']['counter'] = counter
+            dedupers[deduper_id]['counter'] = counter
             resp = {'counter': counter}
         deduper.markPairs(labels)
-        flask_session['deduper']['training_data'] = labels
-        flask_session['deduper']['counter'] = counter
+        dedupers[deduper_id]['training_data'] = labels
+        dedupers[deduper_id]['counter'] = counter
         if resp.get('finished'):
-            del flask_session['deduper']
+            del dedupers[deduper_id]
     resp = make_response(json.dumps(resp))
     resp.headers['Content-Type'] = 'application/json'
     return resp
