@@ -229,15 +229,12 @@ def mark_pair():
             resp = {'counter': counter}
         elif action == 'finish':
             file_io = flask_session['deduper']['csv']
-            training_file_path = os.path.join(UPLOAD_FOLDER, '%s-training.json' % file_io.file_path)
             training_data = flask_session['deduper']['training_data']
-            with open(training_file_path, 'wb') as f:
-                f.write(json.dumps(training_data, default=_to_json))
             field_defs = flask_session['deduper']['field_defs']
             sample = deduper.data_sample
             args = {
                 'field_defs': field_defs,
-                'training_data': training_file_path,
+                'training_data': training_data,
                 'file_io': file_io,
                 'data_sample': sample,
             }

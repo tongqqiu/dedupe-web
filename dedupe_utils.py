@@ -5,6 +5,7 @@ import json
 import time
 from dedupe import AsciiDammit
 import dedupe
+from dedupe.serializer import _to_json, dedupe_decoder
 from cStringIO import StringIO
 from collections import defaultdict, OrderedDict
 import logging
@@ -203,11 +204,15 @@ class WebDeduper(object):
         self.recall_weight = float(recall_weight)
         self.training_data = training_data
         if training_data:
-            self.deduper.readTraining(self.training_data)
+            tr = StringIO(json.dumps(self.training_data, default=_to_json))
+            self.deduper.readTraining(tr)
             self.deduper.train()
             self.settings_path = '%s-settings.dedupe' % self.file_io.file_path
-            self.deduper.writeTraining(self.training_data)
-            self.deduper.writeSettings(self.settings_path)
+            self.training_path = '%s-training.json' % self.file_io.file_path
+            with open(self.settings_path, 'wb') as f:
+                self.deduper.writeSettings(f)
+            with open(self.training_path, 'wb') as f:
+                self.deduper.writeTraining(f)
 
     def dedupe(self):
         threshold = self.deduper.threshold(self.data_d, recall_weight=self.recall_weight)
@@ -228,7 +233,7 @@ class WebDeduper(object):
             'line_count': line_count,
         }
         if self.training_data:
-            files['training'] = os.path.relpath(self.training_data, __file__)
+            files['training'] = os.path.relpath(self.training_path, __file__)
             files['settings'] = os.path.relpath(self.settings_path, __file__)
         return files
     
