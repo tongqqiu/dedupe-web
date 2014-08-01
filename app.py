@@ -184,8 +184,8 @@ def get_pair():
         deduper = flask_session['deduper']['deduper']
         filename = flask_session['filename']
         flask_session['last_interaction'] = datetime.now()
-        fields = [f[0] for f in deduper.data_model.field_comparators]
-        #fields = deduper.data_model.field_comparators
+        #fields = [f[0] for f in deduper.data_model.field_comparators]
+        fields = deduper.data_model.field_comparators
         record_pair = deduper.uncertainPairs()[0]
         flask_session['deduper']['current_pair'] = record_pair
         data = []

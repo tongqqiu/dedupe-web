@@ -71,10 +71,11 @@ class DedupeFileIO(object):
         duplicates clustered. 
         """
         cluster_membership = {}
+        cluster_id = None
         for cluster_id, cluster in enumerate(self.clustered_dupes):
             for record_id in cluster:
                 cluster_membership[record_id] = cluster_id
-
+        
         unique_record_id = cluster_id + 1
         
         f = StringIO(self.converted)
@@ -211,6 +212,8 @@ class WebDeduper(object):
     def dedupe(self):
         threshold = self.deduper.threshold(self.data_d, recall_weight=self.recall_weight)
         clustered_dupes = self.deduper.match(self.data_d, threshold)
+        if not clustered_dupes:
+            raise DedupeFileError('Sorry, we did not find any duplicates')
         self.file_io.prepare(clustered_dupes)
         if self.file_io.file_type == 'csv':
             deduped, deduped_unique, cluster_count, line_count = self.file_io.writeCSV()
