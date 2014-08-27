@@ -98,7 +98,6 @@ def index():
                     flask_session['ga_cid'], 
                     label=inp_file.file_type, 
                 )
-                print flask_session.keys()
                 return redirect(url_for('select_fields'))
             except DedupeFileError as e:
                 send_ga_log('Upload Error', flask_session['ga_cid'], label=e.message)
@@ -130,7 +129,6 @@ def readData(inp):
 def select_fields():
     status_code = 200
     error = None
-    print flask_session.keys()
     if not flask_session.get('deduper'):
         return redirect(url_for('index'))
     else:
@@ -144,9 +142,9 @@ def select_fields():
             field_list = [r for r in request.form]
             if field_list:
                 training = True
-                field_defs = {}
+                field_defs = []
                 for field in field_list:
-                    field_defs[field] = {'type': 'String'}
+                  field_defs.append({'field': field, 'type': 'String'})
                 data_d = readData(inp)
                 flask_session['deduper']['data_d'] = data_d
                 flask_session['deduper']['field_defs'] = copy.deepcopy(field_defs)
@@ -184,8 +182,7 @@ def get_pair():
         deduper = flask_session['deduper']['deduper']
         filename = flask_session['filename']
         flask_session['last_interaction'] = datetime.now()
-        #fields = [f[0] for f in deduper.data_model.field_comparators]
-        fields = deduper.data_model.field_comparators
+        fields = [f[0] for f in deduper.data_model.field_comparators]
         record_pair = deduper.uncertainPairs()[0]
         flask_session['deduper']['current_pair'] = record_pair
         data = []
