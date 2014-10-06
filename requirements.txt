@@ -5,3 +5,4 @@ redis
 csvkit
 xlwt
 dedupe
+raven
