@@ -9,7 +9,7 @@ import re
 import os
 import copy
 import time
-from dedupe import AsciiDammit
+import AsciiDammit
 from dedupe.serializer import _to_json, dedupe_decoder
 import dedupe
 from dedupe_utils import dedupeit, static_dedupeit, DedupeFileIO,\
