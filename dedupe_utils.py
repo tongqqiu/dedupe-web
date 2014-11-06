@@ -266,7 +266,7 @@ def dedupeit(**kwargs):
 
 @queuefunc
 def static_dedupeit(**kwargs):
-    d = dedupe.StaticDedupe(kwargs['settings_path'])
+    d = dedupe.StaticDedupe(open(kwargs['settings_path'], 'r'))
     file_io = DedupeFileIO(kwargs['file_path'], kwargs['filename'])
     deduper = WebDeduper(d, 
         file_io=file_io,
